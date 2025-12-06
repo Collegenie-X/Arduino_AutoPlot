@@ -13,8 +13,7 @@
 #include <IRremote.h>
 
 // 리피트 코드 (버튼을 누르고 있을 때 반복 전송됨)
-// 0xFFFFFFFF = 4294967295 (unsigned long으로 명시)
-#define IR_REPEAT_CODE  4294967295UL
+#define IR_REPEAT_CODE  0xFFFFFFFF
 
 /*******************************************************************************
  * IR 리모컨 버튼 코드 (16진수 / 10진수)
@@ -22,36 +21,24 @@
 // 숫자 버튼
 #define IR_BTN_0      16738455   // 0xFF6897
 #define IR_BTN_1      16724175   // 0xFF30CF
-#define IR_BTN_2      16718055   // 0xFF18E7 - 전진
+#define IR_BTN_2      1033561079   // 0xFF18E7 - 전진
 #define IR_BTN_3      16743045   // 0xFF7A85
-#define IR_BTN_4      16716015   // 0xFF10EF - 좌회전
-#define IR_BTN_5      16726215   // 0xFF38C7 - 정지
-#define IR_BTN_6      16734885   // 0xFF5AA5 - 우회전
+#define IR_BTN_4      2351064443   // 0xFF10EF - 좌회전
+#define IR_BTN_5      2427583254   // 0xFF38C7 - 정지
+#define IR_BTN_6      71952287   // 0xFF5AA5 - 우회전
 #define IR_BTN_7      16728765   // 0xFF42BD
-#define IR_BTN_8      16730805   // 0xFF4AB5 - 후진
+#define IR_BTN_8      4136307364   // 0xFF4AB5 - 후진
 #define IR_BTN_9      16732845   // 0xFF52AD
 
 // 기능 버튼
 #define IR_BTN_PLUS   16754775   // 0xFFA857 - 속도 증가
-#define IR_BTN_MINUS  16769055   // 0xFFE01F - 속도 감소
-#define IR_BTN_EQ     16748655   // 0xFF906F
-#define IR_BTN_100    16750695   // 0xFF9867
-#define IR_BTN_200    16756815   // 0xFFB04F
-#define IR_BTN_PREV   16720605   // 0xFF22DD - <<
-#define IR_BTN_NEXT   16712445   // 0xFF02FD - >>
-#define IR_BTN_PLAY   16761405   // 0xFFC23D - >|
-#define IR_BTN_CH_M   16753245   // 0xFFA25D - CH-
-#define IR_BTN_CH     16736925   // 0xFF629D - CH
-#define IR_BTN_CH_P   16769565   // 0xFFE21D - CH+
+#define IR_BTN_MINUS  2535091102   // 0xFFE01F - 속도 감소
 
 /*******************************************************************************
  * 핀 설정
  ******************************************************************************/
 // IR 수신 핀
 const int PIN_IR_RECV = A0;
-
-// 부저 핀 (3번 = tone() 사용)
-const int PIN_BUZZER = 3;
 
 // 모터 드라이버 핀
 const int PIN_MOTOR_R_EN  = 5;    // 오른쪽 모터 Enable (PWM)
@@ -72,10 +59,6 @@ const int SPEED_STEP    = 20;     // 속도 증감 단위
 // 회전 시 속도 비율
 const float TURN_FAST_RATIO = 1.4;  // 바깥쪽 바퀴
 const float TURN_SLOW_RATIO = 0.4;  // 안쪽 바퀴
-
-// 비프음 설정 (tone() 사용)
-const int BEEP_FREQ     = 1000;   // 비프 주파수 (Hz)
-const int BEEP_DURATION = 50;     // 비프 길이 (ms)
 
 /*******************************************************************************
  * 차량 상태 정의
@@ -124,10 +107,6 @@ void speed_down(void);
 void update_motor_output(void);
 void print_status(const char* action);
 
-// 비프음 함수
-void beep(void);
-void beep_error(void);
-
 /*******************************************************************************
  * 초기화
  ******************************************************************************/
@@ -152,16 +131,8 @@ void setup() {
   pinMode(PIN_MOTOR_L_IN3, OUTPUT);
   pinMode(PIN_MOTOR_L_IN4, OUTPUT);
   
-  // 부저 핀 초기화
-  pinMode(PIN_BUZZER, OUTPUT);
-  
   // IR 수신 시작
   ir_receiver.enableIRIn();
-  
-  // 시작 비프음 (준비 완료 알림)
-  beep();
-  delay(100);
-  beep();
   
   // 초기 상태: 정지
   motor_stop();
@@ -178,12 +149,9 @@ void loop() {
   if (ir_receiver.decode(&ir_signal)) {
     unsigned long ir_code = ir_signal.value;
     
-    // 리피트 코드 처리 (버튼 길게 누를 때)
-    // 0xFFFFFFFF = 4294967295
-    if (ir_code == IR_REPEAT_CODE || ir_code == 0xFFFFFFFF) {
-      // 리피트 코드는 무시 (출력 없이 넘어감)
-      // 필요하면 아래 주석 해제하여 확인 가능
-      // Serial.println("[REPEAT]");
+    // 리피트 코드 처리: 무시
+    if (ir_code == IR_REPEAT_CODE) {
+      // 리피트 코드는 무시 (모터 상태 유지)
     } else {
       // 새로운 유효 코드
       last_valid_code = ir_code;
@@ -207,8 +175,6 @@ void loop() {
  * IR 명령 처리
  ******************************************************************************/
 void process_ir_command(unsigned long ir_code) {
-  bool valid_command = true;  // 유효한 명령인지 플래그
-  
   switch (ir_code) {
     // 속도 제어
     case IR_BTN_PLUS:
@@ -248,18 +214,11 @@ void process_ir_command(unsigned long ir_code) {
       break;
       
     default:
-      // 알 수 없는 버튼 - 마지막 유효 코드 초기화 (오작동 방지)
-      valid_command = false;
+      // 알 수 없는 버튼
       last_valid_code = 0;
       Serial.print(">> Unknown: 0x");
       Serial.println(ir_code, HEX);
-      beep_error();  // 에러 비프음
       break;
-  }
-  
-  // 유효한 명령이면 비프음
-  if (valid_command) {
-    beep();
   }
 }
 
@@ -395,18 +354,4 @@ void print_status(const char* action) {
   Serial.print(" (");
   Serial.print((current_speed * 100) / 255);
   Serial.println("%)");
-}
-
-/*******************************************************************************
- * 비프음 함수들 (tone() 사용)
- ******************************************************************************/
-
-// 정상 비프음 (짧은 삐!) - 1000Hz, 50ms
-void beep(void) {
-  //tone(PIN_BUZZER, BEEP_FREQ, BEEP_DURATION);
-}
-
-// 에러 비프음 (낮고 긴 음) - 500Hz, 200ms
-void beep_error(void) {
-  //tone(PIN_BUZZER, 500, 200);
 }
