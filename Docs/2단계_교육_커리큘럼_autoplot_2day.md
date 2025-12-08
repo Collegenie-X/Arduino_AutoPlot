@@ -19,7 +19,7 @@
 ## 📊 프로젝트 난이도 구성
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph Level1[🟢 Level 1: 원격 제어]
         A1[블루투스 통신]
         A2[음성 인식 STT]
@@ -490,7 +490,7 @@ void loop() {
 ### 🚧 실제 자율주행 연계: 자동 긴급 제동 (AEB)
 
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph 실제_AEB
         A[라이다/레이더] --> B[장애물 감지]
         B --> C[충돌 예측]
@@ -732,7 +732,7 @@ if (frontDist > 0 && frontDist < 20) {  // 20cm로 변경
 ### 🚗 실제 자율주행 연계: 적응형 순항 제어 (ACC)
 
 ```mermaid
-flowchart TB
+flowchart  LR
     subgraph 실제_ACC
         A[레이더/카메라] --> B[앞차 감지]
         B --> C[거리 측정]
